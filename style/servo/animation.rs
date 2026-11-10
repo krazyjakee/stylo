@@ -616,6 +616,50 @@ impl Animation {
         new_ui.animation_duration_mod(index).seconds() == 0.
     }
 
+    /// The time (on the animation timeline) of the next moment after `now` at
+    /// which this animation's value can change, when its value only changes in
+    /// jumps: every keyframe interval uses a `steps()` timing function. `None`
+    /// when it changes continuously, or isn't running, and so needs a tick
+    /// every frame.
+    ///
+    /// The result may be early (a step boundary where the value happens not to
+    /// change), never late, so an embedder can sleep until then.
+    pub fn next_change_after(&self, now: f64) -> Option<f64> {
+        if self.state != AnimationState::Running
+            || self.computed_steps.len() < 2
+            || !(self.duration > 0.)
+        {
+            return None;
+        }
+        // Progress through the current iteration (`started_at` advances with each).
+        let progress = (now - self.started_at) / self.duration;
+        if progress < 0. {
+            return Some(self.started_at);
+        }
+        // Every point in the iteration where a step or keyframe begins, plus its ends.
+        let mut boundaries = vec![0., 1.];
+        for pair in self.computed_steps.windows(2) {
+            let (start, end) = (pair[0].start_percentage, pair[1].start_percentage);
+            let TimingFunction::Steps(steps, _) = pair[0].timing_function else {
+                return None;
+            };
+            let steps = steps.max(1);
+            for k in 0..=steps {
+                boundaries.push(start + (end - start) * f64::from(k) / f64::from(steps));
+            }
+        }
+        let next = boundaries
+            .into_iter()
+            .map(|b| match self.current_direction {
+                AnimationDirection::Reverse => 1. - b,
+                _ => b,
+            })
+            .filter(|b| *b > progress + 1e-9)
+            .fold(f64::INFINITY, f64::min);
+        next.is_finite()
+            .then(|| self.started_at + next * self.duration)
+    }
+
     /// Given the current time, advances this animation to the next iteration,
     /// updates times, and then toggles the direction if appropriate. Otherwise
     /// does nothing. Returns true if this animation has iterated.
