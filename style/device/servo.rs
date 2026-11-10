@@ -79,6 +79,9 @@ pub struct MediaData {
     /// Whether the user prefers light mode or dark mode
     #[ignore_malloc_size_of = "Pure stack type"]
     pub prefers_color_scheme: PrefersColorScheme,
+    /// Whether the user asked for reduced motion (`prefers-reduced-motion: reduce`).
+    #[ignore_malloc_size_of = "Pure stack type"]
+    pub prefers_reduced_motion: bool,
     /// The capabilities of the primary pointer input
     #[ignore_malloc_size_of = "Pure stack type"]
     pub primary_pointer_capabilities: PointerCapabilities,
@@ -323,6 +326,19 @@ impl Device {
     /// `Stylist::force_stylesheet_origins_dirty`.
     pub fn set_color_scheme(&mut self, new_color_scheme: PrefersColorScheme) {
         self.extra.media_data.prefers_color_scheme = new_color_scheme;
+    }
+
+    /// Set whether the user prefers reduced motion on this [`Device`].
+    ///
+    /// Like [`Self::set_color_scheme`], this does not update any associated
+    /// `Stylist`.
+    pub fn set_prefers_reduced_motion(&mut self, reduced: bool) {
+        self.extra.media_data.prefers_reduced_motion = reduced;
+    }
+
+    /// Whether the user prefers reduced motion.
+    pub fn prefers_reduced_motion(&self) -> bool {
+        self.extra.media_data.prefers_reduced_motion
     }
 
     /// Returns the color scheme of this [`Device`].
